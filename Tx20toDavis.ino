@@ -12,6 +12,10 @@ Outputs:
   ADC0: Wind direction
 */
 
+// 1600 rotations per hour or 2.25 seconds per rotation
+// equals 1 mp/h wind speed (1 mp/h = 1609/3600 m/s)
+// speed (m/s) = rotations * 1135.24 / delta t
+
 void setup() {
 }
 
