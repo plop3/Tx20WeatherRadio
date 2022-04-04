@@ -1,5 +1,5 @@
 /*
-Lacrosse anemometer [TX20 protocol](https://github.com/bunnyhu/ESP8266_TX20_wind_sensor)  converter to Davis anemometer protocol
+Lacrosse anemometer TX20 protocol converter to Davis anemometer protocol
 Use an ESP32 (ADC 0-3.3V output)
 Serge CLAUS
 Version 0.1
