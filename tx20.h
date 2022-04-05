@@ -2,10 +2,8 @@
     direction:
     https://www.john.geek.nz/2011/07/la-crosse-tx20-anemometer-communication-protocol/
     https://github.com/bunnyhu/ESP8266_TX20_wind_sensor
-
         The wind speed is measured in m/s, the direction is measured in deg, i.e.
     N = 0 deg, E = 90 deg etc.
-
     This application is free software; you can redistribute it and/or
     modify it under the terms of the GNU General Public
     License as published by the Free Software Foundation; either
@@ -16,11 +14,11 @@
 WiFiClient espClient;
 PubSubClient MQTTclient(espClient);
 
-void initAnemometer();
-void reconnect();
+//void initAnemometer();
+//void reconnect();
 
 float windSpeed=0;
-float windDir=0;
+int windDir=0;
 
 struct {
   bool status;
@@ -31,49 +29,12 @@ struct {
 } anemometerData = {false,  0, 0.0, 0.0, 0.0};
 
 // intermediate values to translate #rotations into wind speed
-volatile float minSpeed;              // minimal wind speed since startTime
-volatile float maxSpeed;              // maximal wind speed since startTime
-
-// intermediate values to calculate an average wind direction
-volatile float initial_direction; // remember the first direction measured
-volatile float direction_diffs;   // and collect the diffs to build the average
-volatile unsigned long startTime;     // overall start time for calculating the wind speed
-
-
-// calculate the windspeed
-float windspeed(unsigned long time, unsigned long startTime, unsigned int rotations) {
-
-  // 1600 rotations per hour or 2.25 seconds per rotation
-  // equals 1 mp/h wind speed (1 mp/h = 1609/3600 m/s)
-  // speed (m/s) = rotations * 1135.24 / delta t
-
-  if (time == startTime)
-    return 0.0;
-  else
-    return (windSpeed);
-}
-
-// calculate the wind direction in degree (N = 0, E = 90, ...)
-int winddirection() {
-  // the wind direction is measured with a potentiometer
-  volatile int direction = windDir;
-
-  // ensure 0 <= direction <360
-  if (direction >= 360)
-    direction -= 360;
-  else if (direction < 0)
-    direction += 360;
-
-  return direction;
-}
-
+float minSpeed;              // minimal wind speed since startTime
+float maxSpeed;              // maximal wind speed since startTime
 
 void reset(unsigned long time) {
-  startTime      = time;
   maxSpeed       = 0.0;
-  minSpeed       = 9999.0;
-  initial_direction = winddirection();
-  direction_diffs = 0;
+  minSpeed       = 0.0;
 }
 
 
@@ -86,19 +47,6 @@ void updateAnemometer() {
         reconnect();
     }
     MQTTclient.loop();
-      volatile float speed = windSpeed;
-
-      // update min and max values
-      minSpeed = speed < minSpeed ? speed : minSpeed;
-      maxSpeed = speed > maxSpeed ? speed : maxSpeed;
-
-      // calculate the difference in the wind direction
-      volatile int current_direction = winddirection();
-      volatile int diff = initial_direction - current_direction;
-      // ensure that the diff is in the range -180 < diff <= 180
-      if (diff > 180) diff -= 360;
-      if (diff <= -180) diff += 360;
-        direction_diffs += diff;
   }
   else
     initAnemometer();
@@ -110,14 +58,8 @@ void updateAnemometer() {
 void readAnemometer() {
   updateAnemometer();
   anemometerData.avgSpeed = windSpeed;
-  anemometerData.minSpeed = min(minSpeed, maxSpeed);
+  anemometerData.minSpeed = minSpeed;
   anemometerData.maxSpeed = maxSpeed;
-  /*
-  if (slices > 0)
-    anemometerData.direction = round(initial_direction - (direction_diffs / slices));
-  else
-    anemometerData.direction = initial_direction;
-    */
    anemometerData.direction = windDir;
   reset(millis());
 }
@@ -157,37 +99,31 @@ void reconnect() {
       //Serial.print(MQTTclient.state());
       //Serial.println(" try again in 5 seconds");
       // Wait 5 seconds before retrying
-      delay(5000);
+      delay(2000);
     }
   }
 }
 
 void callback(char* topic, byte* payload, unsigned int length) {
-  Serial.print("Message arrived [");
-  Serial.print(topic);
-  Serial.print("] ");
-  String topicStr(topic);
-  for (int i = 0; i < length; i++) {
-    Serial.print((char)payload[i]);
-  }
-  Serial.println();
-  Serial.println(topicStr);
-
-  // Switch on the LED if an 1 was received as first character
-  if ((char)payload[0] == '1') {
-    digitalWrite(BUILTIN_LED, LOW);   // Turn the LED on (Note that LOW is the voltage level
-    // but actually the LED is on; this is because
-    // it is active low on the ESP-01)
-  } else {
-    digitalWrite(BUILTIN_LED, HIGH);  // Turn the LED off by making the voltage HIGH
-  }
-
+	payload[length] = '\0';
+	if (strcmp(topic,"windspeed") == 0 {
+		windSpeed = atof((char *)payload);
+	}
+	if (strcmp(topic,"gust") == 0 {
+		maxSpeed = atof((char *)payload);
+	}
+	if (strcmp(topic,"min") == 0 {
+		minSpeed = atof((char *)payload);
+	}
+	if (strcmp(topic,"winddir") == 0 {
+		windDir = atoi((char *)payload);
+	}
 }
 
 void initAnemometer() {
   MQTTclient.setServer(MQTT_ADDRESS, 1883);
-  //PubSubClient client(server, 1883, callback, ethClient);
   MQTTclient.setCallback(callback);
+  reconnect();
   anemometerData.status = true;
   // reset measuring data
   reset(millis());
